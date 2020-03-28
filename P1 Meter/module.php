@@ -23,34 +23,62 @@
 			$instances = IPS_GetInstanceListByModuleID("{43192F0B-135B-4CE7-A0A7-1475603F3060}");
 
 			$id = $this->RegisterVariableFloat("CurrentPowerConsumption", "Power consumption", "~Watt.14490", 0);
-			AC_SetLoggingStatus($instances[0], $id, true);
-			AC_SetAggregationType($instances[0], $id, 0);
+			if(!AC_GetLoggingStatus($instances[0], $id)) {
+				AC_SetLoggingStatus($instances[0], $id, true);
+			}
+			if(AC_GetAggregationType($instances[0], $id) != 0) {
+				AC_SetAggregationType($instances[0], $id, 0);
+			}
 
 			$id = $this->RegisterVariableFloat("ConsumedElectricityHigh", "Consumed electricity (high)", "~Electricity", 2);
-			AC_SetLoggingStatus($instances[0], $id, true);
-			AC_SetAggregationType($instances[0], $id, 0);
+			if(!AC_GetLoggingStatus($instances[0], $id)) {
+				AC_SetLoggingStatus($instances[0], $id, true);
+			}
+			if(AC_GetAggregationType($instances[0], $id) != 1) {
+				AC_SetAggregationType($instances[0], $id, 1);
+			}
 
 			$id = $this->RegisterVariableFloat("ConsumedElectricityLow", "Consumed electricity (low)", "~Electricity", 1);
-			AC_SetLoggingStatus($instances[0], $id, true);
-			AC_SetAggregationType($instances[0], $id, 0);
+			if(!AC_GetLoggingStatus($instances[0], $id)) {
+				AC_SetLoggingStatus($instances[0], $id, true);
+			}
+			if(AC_GetAggregationType($instances[0], $id) != 1) {
+				AC_SetAggregationType($instances[0], $id, 1);
+			}
 
 			$id = $this->RegisterVariableFloat("ConsumedGas", "Consumed gas", "~Gas", 10);
-			AC_SetLoggingStatus($instances[0], $id, true);
-			AC_SetAggregationType($instances[0], $id, 0);
+			if(!AC_GetLoggingStatus($instances[0], $id)) {
+				AC_SetLoggingStatus($instances[0], $id, true);
+			}
+			if(AC_GetAggregationType($instances[0], $id) != 1) {
+				AC_SetAggregationType($instances[0], $id, 1);
+			}
 
 			$trackPowerGeneration = $this->ReadPropertyBoolean("Track power generation");
 			if($trackPowerGeneration) {
 				$id = $this->RegisterVariableFloat("CurrentPowerGeneration", "Power generation", "~Watt.14490", 3);
-				AC_SetLoggingStatus($instances[0], $id, true);
-				AC_SetAggregationType($instances[0], $id, 0);
+				if(!AC_GetLoggingStatus($instances[0], $id)) {
+					AC_SetLoggingStatus($instances[0], $id, true);
+				}
+				if(AC_GetAggregationType($instances[0], $id) != 0) {
+					AC_SetAggregationType($instances[0], $id, 0);
+				}
 				
 				$id = $this->RegisterVariableFloat("GeneratedElectricityHigh", "Generated electricity (high)", "~Electricity", 5);
-				AC_SetLoggingStatus($instances[0], $id, true);
-				AC_SetAggregationType($instances[0], $id, 0);
+				if(!AC_GetLoggingStatus($instances[0], $id)) {
+					AC_SetLoggingStatus($instances[0], $id, true);
+				}
+				if(AC_GetAggregationType($instances[0], $id) != 1) {
+					AC_SetAggregationType($instances[0], $id, 1);
+				}
 
 				$id = $this->RegisterVariableFloat("GeneratedElectricityLow", "Generated electricity (low)", "~Electricity", 4);
-				AC_SetLoggingStatus($instances[0], $id, true);
-				AC_SetAggregationType($instances[0], $id, 0);
+				if(!AC_GetLoggingStatus($instances[0], $id)) {
+					AC_SetLoggingStatus($instances[0], $id, true);
+				}
+				if(AC_GetAggregationType($instances[0], $id) != 1) {
+					AC_SetAggregationType($instances[0], $id, 1);
+				}
 			} else {
 				$this->UnregisterVariable("CurrentPowerGeneration");
 				$this->UnregisterVariable("GeneratedElectricityHigh");

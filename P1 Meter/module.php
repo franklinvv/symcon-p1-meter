@@ -1,4 +1,6 @@
 <?php
+	define("BUFFER", "P1 Telegram");
+
 	class P1Meter extends IPSModule {
 
 		public function Create() {
@@ -17,18 +19,138 @@
 		public function ApplyChanges() {
 			//Never delete this line!
 			parent::ApplyChanges();
-		}
 
-		// public function Send(string $Text)
-		// {
-		// 	$this->SendDataToParent(json_encode(Array("DataID" => "{79827379-F36E-4ADA-8A95-5F8D1DC92FA9}", "Buffer" => $Text)));
-		// }
+			$instances = IPS_GetInstanceListByModuleID("{43192F0B-135B-4CE7-A0A7-1475603F3060}");
+
+			$id = $this->RegisterVariableFloat("CurrentPowerConsumption", "Power consumption", "~Watt.14490", 0);
+			AC_SetLoggingStatus($instances[0], $id, true);
+			AC_SetAggregationType($instances[0], $id, 0);
+
+			$id = $this->RegisterVariableFloat("ConsumedElectricityHigh", "Consumed electricity (high)", "~Electricity", 2);
+			AC_SetLoggingStatus($instances[0], $id, true);
+			AC_SetAggregationType($instances[0], $id, 0);
+
+			$id = $this->RegisterVariableFloat("ConsumedElectricityLow", "Consumed electricity (low)", "~Electricity", 1);
+			AC_SetLoggingStatus($instances[0], $id, true);
+			AC_SetAggregationType($instances[0], $id, 0);
+
+			$id = $this->RegisterVariableFloat("ConsumedGas", "Consumed gas", "~Gas", 10);
+			AC_SetLoggingStatus($instances[0], $id, true);
+			AC_SetAggregationType($instances[0], $id, 0);
+
+			$trackPowerGeneration = $this->ReadPropertyBoolean("Track power generation");
+			if($trackPowerGeneration) {
+				$id = $this->RegisterVariableFloat("CurrentPowerGeneration", "Power generation", "~Watt.14490", 3);
+				AC_SetLoggingStatus($instances[0], $id, true);
+				AC_SetAggregationType($instances[0], $id, 0);
+				
+				$id = $this->RegisterVariableFloat("GeneratedElectricityHigh", "Generated electricity (high)", "~Electricity", 5);
+				AC_SetLoggingStatus($instances[0], $id, true);
+				AC_SetAggregationType($instances[0], $id, 0);
+
+				$id = $this->RegisterVariableFloat("GeneratedElectricityLow", "Generated electricity (low)", "~Electricity", 4);
+				AC_SetLoggingStatus($instances[0], $id, true);
+				AC_SetAggregationType($instances[0], $id, 0);
+			} else {
+				$this->UnregisterVariable("CurrentPowerGeneration");
+				$this->UnregisterVariable("GeneratedElectricityHigh");
+				$this->UnregisterVariable("GeneratedElectricityLow");
+			}
+		}
 
 		public function ReceiveData($JSONString) {
 			$data = json_decode($JSONString);
-			$telegram = utf8_decode($data->Buffer);
-			
+			$telegramPart = utf8_decode($data->Buffer);
+			if($this->telegram = $this->buildTelegram($telegramPart)) {
+				$powerConsumption = $this->extractPowerConsumption();
+				if($powerConsumption != $this->GetValue("CurrentPowerConsumption")) {
+					$this->SetValue("CurrentPowerConsumption", $powerConsumption);
+				}
+				//$this->UpdateFormField("Current power consumption", "caption", sprintf("Current power consumption: %.0f Watt", $powerConsumption));
+				
+				$consumedHigh = $this->extractConsumedHigh();
+				if($consumedHigh != $this->GetValue("ConsumedElectricityHigh")) {
+					$this->SetValue("ConsumedElectricityHigh", $consumedHigh);
+				}
 
-			//IPS_LogMessage("Device RECV", utf8_decode($data->Buffer));
+				$consumedLow = $this->extractConsumedLow();
+				if($consumedLow != $this->GetValue("ConsumedElectricityLow")) {
+					$this->SetValue("ConsumedElectricityLow", $consumedLow);
+				}
+
+				$consumedGas = $this->extractConsumedGas();
+				if($consumedGas != $this->GetValue("ConsumedGas")) {
+					$this->SetValue("ConsumedGas", $consumedGas);
+				}
+
+				$trackPowerGeneration = $this->ReadPropertyBoolean("Track power generation");
+				if($trackPowerGeneration) {
+					$powerGeneration = $this->extractPowerGeneration();
+					if($powerGeneration != $this->GetValue("CurrentPowerGeneration")) {
+						$this->SetValue("CurrentPowerGeneration", $powerGeneration);
+					}
+					//$this->UpdateFormField("Current power generation", "caption", sprintf("Current power generation: %.0f Watt", $powerGeneration));
+
+					$generatedHigh = $this->extractGeneratedHigh();
+					if($generatedHigh != $this->GetValue("GeneratedElectricityHigh")) {
+						$this->SetValue("GeneratedElectricityHigh", $generatedHigh);
+					}
+
+					$generatedLow = $this->extractGeneratedLow();
+					if($generatedLow != $this->GetValue("GeneratedElectricityLow")) {
+						$this->SetValue("GeneratedElectricityLow", $generatedLow);
+					}
+				}
+			}
+		}
+
+		private function extractCurrentTariff() {
+			preg_match("/(?<=0-0:96\.14\.0\()\d+/", $this->telegram, $matches);
+			return (int)$matches[0];
+		}
+
+		private function extractPowerConsumption() {
+			preg_match("/(?<=1-0:1\.7\.0\()\d+\.\d+/", $this->telegram, $matches);
+			return (float)$matches[0] * 1000;
+		}
+
+		private function extractPowerGeneration() {
+			preg_match("/(?<=1-0:2\.7\.0\()\d+\.\d+/", $this->telegram, $matches);
+			return (float)$matches[0] * 1000;
+		}
+
+		private function extractConsumedLow() {
+			preg_match("/(?<=1-0:1\.8\.1\()\d+\.\d+/", $this->telegram, $matches);
+			return (float)$matches[0];
+		}
+
+		private function extractConsumedHigh() {
+			preg_match("/(?<=1-0:1\.8\.2\()\d+\.\d+/", $this->telegram, $matches);
+			return (float)$matches[0];
+		}
+
+		private function extractGeneratedLow() {
+			preg_match("/(?<=1-0:2\.8\.1\()\d+\.\d+/", $this->telegram, $matches);
+			return (float)$matches[0];
+		}
+
+		private function extractGeneratedHigh() {
+			preg_match("/(?<=1-0:2\.8\.2\()\d+\.\d+/", $this->telegram, $matches);
+			return (float)$matches[0];
+		}
+
+		private function extractConsumedGas() {
+			preg_match("/(?<=0-1:24.2.1\(\d{12}W\)\()\d+\.\d+/", $this->telegram, $matches);
+			return (float)$matches[0];
+		}
+
+		private function buildTelegram($part) {
+			$parts = $this->GetBuffer(BUFFER).$part;
+			$this->SetBuffer(BUFFER, $parts);
+			if(strpos($parts, "!")) {
+				$this->SetBuffer(BUFFER, "");
+				return $parts;
+			}
+			return NULL;
 		}
 	}

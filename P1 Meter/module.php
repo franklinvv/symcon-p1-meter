@@ -9,6 +9,30 @@
 
 			$this->RequireParent("{6DC3D946-0D31-450F-A8C6-C42DB8D7D4F1}");
 			$this->RegisterPropertyBoolean("Track power generation", false);
+
+			$var = IPS_GetObjectIDByIdent("CurrentPowerConsumption", $this->InstanceID);
+			if(!$var) {
+				$id = $this->RegisterVariableFloat("CurrentPowerConsumption", "Power consumption", "~Watt.14490", 0);
+				$this->enableLogging($id, 0);
+			}
+
+			$var = IPS_GetObjectIDByIdent("ConsumedElectricityHigh", $this->InstanceID);
+			if(!$var) {
+				$id = $this->RegisterVariableFloat("ConsumedElectricityHigh", "Consumed electricity (high)", "~Electricity", 2);
+				$this->enableLogging($id, 1);
+			}
+
+			$var = IPS_GetObjectIDByIdent("ConsumedElectricityLow", $this->InstanceID);
+			if(!$var) {
+				$id = $this->RegisterVariableFloat("ConsumedElectricityLow", "Consumed electricity (low)", "~Electricity", 1);
+				$this->enableLogging($id, 1);
+			}
+
+			$var = IPS_GetObjectIDByIdent("ConsumedGas", $this->InstanceID);
+			if(!$var) {
+				$id = $this->RegisterVariableFloat("ConsumedGas", "Consumed gas", "~Gas", 10);
+				$this->enableLogging($id, 1);
+			}
 		}
 
 		public function Destroy() {
@@ -19,29 +43,27 @@
 		public function ApplyChanges() {
 			//Never delete this line!
 			parent::ApplyChanges();
-
-			$id = $this->RegisterVariableFloat("CurrentPowerConsumption", "Power consumption", "~Watt.14490", 0);
-			$this->enableLogging($id, 0);
-
-			$id = $this->RegisterVariableFloat("ConsumedElectricityHigh", "Consumed electricity (high)", "~Electricity", 2);
-			$this->enableLogging($id, 1);
-
-			$id = $this->RegisterVariableFloat("ConsumedElectricityLow", "Consumed electricity (low)", "~Electricity", 1);
-			$this->enableLogging($id, 1);
-
-			$id = $this->RegisterVariableFloat("ConsumedGas", "Consumed gas", "~Gas", 10);
-			$this->enableLogging($id, 1);
+			$this->SetBuffer(BUFFER, "");
 
 			$trackPowerGeneration = $this->ReadPropertyBoolean("Track power generation");
 			if($trackPowerGeneration) {
-				$id = $this->RegisterVariableFloat("CurrentPowerGeneration", "Power generation", "~Watt.14490", 3);
-				$this->enableLogging($id, 0);
+				$var = IPS_GetObjectIDByIdent("CurrentPowerGeneration", $this->InstanceID);
+				if(!$var) {
+					$id = $this->RegisterVariableFloat("CurrentPowerGeneration", "Power generation", "~Watt.14490", 3);
+					$this->enableLogging($id, 0);
+				}
 				
-				$id = $this->RegisterVariableFloat("GeneratedElectricityHigh", "Generated electricity (high)", "~Electricity", 5);
-				$this->enableLogging($id, 1);
+				$var = IPS_GetObjectIDByIdent("GeneratedElectricityHigh", $this->InstanceID);
+				if(!$var) {
+					$id = $this->RegisterVariableFloat("GeneratedElectricityHigh", "Generated electricity (high)", "~Electricity", 5);
+					$this->enableLogging($id, 1);
+				}
 
-				$id = $this->RegisterVariableFloat("GeneratedElectricityLow", "Generated electricity (low)", "~Electricity", 4);
-				$this->enableLogging($id, 1);
+				$var = IPS_GetObjectIDByIdent("GeneratedElectricityLow", $this->InstanceID);
+				if(!$var) {
+					$id = $this->RegisterVariableFloat("GeneratedElectricityLow", "Generated electricity (low)", "~Electricity", 4);
+					$this->enableLogging($id, 1);
+				}
 			} else {
 				$this->UnregisterVariable("CurrentPowerGeneration");
 				$this->UnregisterVariable("GeneratedElectricityHigh");
@@ -70,17 +92,17 @@
 				}
 				//$this->UpdateFormField("Current power consumption", "caption", sprintf("Current power consumption: %.0f Watt", $powerConsumption));
 				
-				$consumedHigh = $this->extractConsumedHigh();
+				$consumedHigh = round($this->extractConsumedHigh(), 2);
 				if($consumedHigh != $this->GetValue("ConsumedElectricityHigh")) {
 					$this->SetValue("ConsumedElectricityHigh", $consumedHigh);
 				}
 
-				$consumedLow = $this->extractConsumedLow();
+				$consumedLow = round($this->extractConsumedLow(), 2);
 				if($consumedLow != $this->GetValue("ConsumedElectricityLow")) {
 					$this->SetValue("ConsumedElectricityLow", $consumedLow);
 				}
 
-				$consumedGas = $this->extractConsumedGas();
+				$consumedGas = round($this->extractConsumedGas(), 2);
 				if($consumedGas != $this->GetValue("ConsumedGas")) {
 					$this->SetValue("ConsumedGas", $consumedGas);
 				}
@@ -142,17 +164,17 @@
 		}
 
 		private function extractConsumedGas() {
-			preg_match("/(?<=0-1:24.2.1\(\d{12}W\)\()\d+\.\d+/", $this->telegram, $matches);
+			preg_match("/(?<=0-1:24.2.1\(\d{12}W|S\)\()\d+\.\d+/", $this->telegram, $matches);
 			return (float)$matches[0];
 		}
 
 		private function buildTelegram($part) {
 			$parts = $this->GetBuffer(BUFFER).$part;
-			$this->SetBuffer(BUFFER, $parts);
 			if(strpos($parts, "!")) {
 				$this->SetBuffer(BUFFER, "");
 				return $parts;
 			}
+			$this->SetBuffer(BUFFER, $parts);
 			return NULL;
 		}
 	}

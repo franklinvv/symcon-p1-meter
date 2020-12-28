@@ -164,7 +164,7 @@
 		}
 
 		private function extractConsumedGas() {
-			preg_match("/(?<=0-1:24.2.1\(\d{12}W|S\)\()\d+\.\d+/", $this->telegram, $matches);
+			preg_match("/(?<=0-1:24.2.1\(\d{12}(W|S)\)\()\d+\.\d+/", $this->telegram, $matches);
 			return (float)$matches[0];
 		}
 

@@ -93,17 +93,17 @@
 				//$this->UpdateFormField("Current power consumption", "caption", sprintf("Current power consumption: %.0f Watt", $powerConsumption));
 				
 				$consumedHigh = round($this->extractConsumedHigh(), 2);
-				if($consumedHigh != $this->GetValue("ConsumedElectricityHigh")) {
+				if($consumedHigh > $this->GetValue("ConsumedElectricityHigh")) {
 					$this->SetValue("ConsumedElectricityHigh", $consumedHigh);
 				}
 
 				$consumedLow = round($this->extractConsumedLow(), 2);
-				if($consumedLow != $this->GetValue("ConsumedElectricityLow")) {
+				if($consumedLow > $this->GetValue("ConsumedElectricityLow")) {
 					$this->SetValue("ConsumedElectricityLow", $consumedLow);
 				}
 
 				$consumedGas = round($this->extractConsumedGas(), 2);
-				if($consumedGas != $this->GetValue("ConsumedGas")) {
+				if($consumedGas > $this->GetValue("ConsumedGas")) {
 					$this->SetValue("ConsumedGas", $consumedGas);
 				}
 

@@ -79,6 +79,7 @@
 			}
 			if(AC_GetAggregationType($instances[0], $id) != $aggregationType) {
 				AC_SetAggregationType($instances[0], $id, $aggregationType);
+				AC_SetCounterIgnoreZeros($instances[0], $id, true);
 			}
 		}
 

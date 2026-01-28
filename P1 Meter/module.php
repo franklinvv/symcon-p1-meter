@@ -3,6 +3,8 @@
 
 	class P1Meter extends IPSModule {
 
+		private ?string $telegram = null;
+
 		public function Create() {
 			//Never delete this line!
 			parent::Create();
@@ -86,87 +88,120 @@
 		public function ReceiveData($JSONString) {
 			$data = json_decode($JSONString);
 			$telegramPart = utf8_decode($data->Buffer);
-			if($this->telegram = $this->buildTelegram($telegramPart)) {
-				$powerConsumption = $this->extractPowerConsumption();
-				if($powerConsumption != $this->GetValue("CurrentPowerConsumption")) {
-					$this->SetValue("CurrentPowerConsumption", $powerConsumption);
+			$this->telegram = $this->buildTelegram($telegramPart);
+
+			if ($this->telegram === null) {
+				return;
+			}
+
+			$trackPowerGeneration = $this->ReadPropertyBoolean("Track power generation");
+
+			if (!$this->validateTelegram($trackPowerGeneration)) {
+				$this->SendDebug("P1 Error", "Invalid telegram received, skipping", 0);
+				return;
+			}
+
+			$powerConsumption = $this->extractPowerConsumption();
+			if ($powerConsumption !== null && $powerConsumption != $this->GetValue("CurrentPowerConsumption")) {
+				$this->SetValue("CurrentPowerConsumption", $powerConsumption);
+			}
+
+			$consumedHigh = $this->extractConsumedHigh();
+			if ($consumedHigh !== null && round($consumedHigh, 2) > $this->GetValue("ConsumedElectricityHigh")) {
+				$this->SetValue("ConsumedElectricityHigh", round($consumedHigh, 2));
+			}
+
+			$consumedLow = $this->extractConsumedLow();
+			if ($consumedLow !== null && round($consumedLow, 2) > $this->GetValue("ConsumedElectricityLow")) {
+				$this->SetValue("ConsumedElectricityLow", round($consumedLow, 2));
+			}
+
+			$consumedGas = $this->extractConsumedGas();
+			if ($consumedGas !== null && round($consumedGas, 2) > $this->GetValue("ConsumedGas")) {
+				$this->SetValue("ConsumedGas", round($consumedGas, 2));
+			}
+
+			if ($trackPowerGeneration) {
+				$powerGeneration = $this->extractPowerGeneration();
+				if ($powerGeneration !== null && $powerGeneration != $this->GetValue("CurrentPowerGeneration")) {
+					$this->SetValue("CurrentPowerGeneration", $powerGeneration);
 				}
-				//$this->UpdateFormField("Current power consumption", "caption", sprintf("Current power consumption: %.0f Watt", $powerConsumption));
-				
-				$consumedHigh = round($this->extractConsumedHigh(), 2);
-				if($consumedHigh > $this->GetValue("ConsumedElectricityHigh")) {
-					$this->SetValue("ConsumedElectricityHigh", $consumedHigh);
+
+				$generatedHigh = $this->extractGeneratedHigh();
+				if ($generatedHigh !== null && $generatedHigh != $this->GetValue("GeneratedElectricityHigh")) {
+					$this->SetValue("GeneratedElectricityHigh", $generatedHigh);
 				}
 
-				$consumedLow = round($this->extractConsumedLow(), 2);
-				if($consumedLow > $this->GetValue("ConsumedElectricityLow")) {
-					$this->SetValue("ConsumedElectricityLow", $consumedLow);
-				}
-
-				$consumedGas = round($this->extractConsumedGas(), 2);
-				if($consumedGas > $this->GetValue("ConsumedGas")) {
-					$this->SetValue("ConsumedGas", $consumedGas);
-				}
-
-				$trackPowerGeneration = $this->ReadPropertyBoolean("Track power generation");
-				if($trackPowerGeneration) {
-					$powerGeneration = $this->extractPowerGeneration();
-					if($powerGeneration != $this->GetValue("CurrentPowerGeneration")) {
-						$this->SetValue("CurrentPowerGeneration", $powerGeneration);
-					}
-					//$this->UpdateFormField("Current power generation", "caption", sprintf("Current power generation: %.0f Watt", $powerGeneration));
-
-					$generatedHigh = $this->extractGeneratedHigh();
-					if($generatedHigh != $this->GetValue("GeneratedElectricityHigh")) {
-						$this->SetValue("GeneratedElectricityHigh", $generatedHigh);
-					}
-
-					$generatedLow = $this->extractGeneratedLow();
-					if($generatedLow != $this->GetValue("GeneratedElectricityLow")) {
-						$this->SetValue("GeneratedElectricityLow", $generatedLow);
-					}
+				$generatedLow = $this->extractGeneratedLow();
+				if ($generatedLow !== null && $generatedLow != $this->GetValue("GeneratedElectricityLow")) {
+					$this->SetValue("GeneratedElectricityLow", $generatedLow);
 				}
 			}
 		}
 
-		private function extractCurrentTariff() {
-			preg_match("/(?<=0-0:96\.14\.0\()\d+/", $this->telegram, $matches);
+		private function extractValue(string $pattern, float $multiplier = 1.0): ?float {
+			if (preg_match($pattern, $this->telegram, $matches) !== 1) {
+				return null;
+			}
+			return (float)$matches[0] * $multiplier;
+		}
+
+		private function validateTelegram(bool $includeGeneration = false): bool {
+			$requiredPatterns = [
+				'power_consumption' => "/1-0:1\.7\.0\(\d+\.\d+/",
+				'consumed_high'     => "/1-0:1\.8\.2\(\d+\.\d+/",
+				'consumed_low'      => "/1-0:1\.8\.1\(\d+\.\d+/",
+				'consumed_gas'      => "/0-1:24\.2\.1\(\d{12}(W|S)\)\(\d+\.\d+/",
+			];
+
+			if ($includeGeneration) {
+				$requiredPatterns['power_generation'] = "/1-0:2\.7\.0\(\d+\.\d+/";
+				$requiredPatterns['generated_high']   = "/1-0:2\.8\.2\(\d+\.\d+/";
+				$requiredPatterns['generated_low']    = "/1-0:2\.8\.1\(\d+\.\d+/";
+			}
+
+			foreach ($requiredPatterns as $field => $pattern) {
+				if (preg_match($pattern, $this->telegram) !== 1) {
+					$this->SendDebug("P1 Validation", "Missing required field: $field", 0);
+					return false;
+				}
+			}
+			return true;
+		}
+
+		private function extractCurrentTariff(): ?int {
+			if (preg_match("/(?<=0-0:96\.14\.0\()\d+/", $this->telegram, $matches) !== 1) {
+				return null;
+			}
 			return (int)$matches[0];
 		}
 
-		private function extractPowerConsumption() {
-			preg_match("/(?<=1-0:1\.7\.0\()\d+\.\d+/", $this->telegram, $matches);
-			return (float)$matches[0] * 1000;
+		private function extractPowerConsumption(): ?float {
+			return $this->extractValue("/(?<=1-0:1\.7\.0\()\d+\.\d+/", 1000);
 		}
 
-		private function extractPowerGeneration() {
-			preg_match("/(?<=1-0:2\.7\.0\()\d+\.\d+/", $this->telegram, $matches);
-			return (float)$matches[0] * 1000;
+		private function extractPowerGeneration(): ?float {
+			return $this->extractValue("/(?<=1-0:2\.7\.0\()\d+\.\d+/", 1000);
 		}
 
-		private function extractConsumedLow() {
-			preg_match("/(?<=1-0:1\.8\.1\()\d+\.\d+/", $this->telegram, $matches);
-			return (float)$matches[0];
+		private function extractConsumedLow(): ?float {
+			return $this->extractValue("/(?<=1-0:1\.8\.1\()\d+\.\d+/");
 		}
 
-		private function extractConsumedHigh() {
-			preg_match("/(?<=1-0:1\.8\.2\()\d+\.\d+/", $this->telegram, $matches);
-			return (float)$matches[0];
+		private function extractConsumedHigh(): ?float {
+			return $this->extractValue("/(?<=1-0:1\.8\.2\()\d+\.\d+/");
 		}
 
-		private function extractGeneratedLow() {
-			preg_match("/(?<=1-0:2\.8\.1\()\d+\.\d+/", $this->telegram, $matches);
-			return (float)$matches[0];
+		private function extractGeneratedLow(): ?float {
+			return $this->extractValue("/(?<=1-0:2\.8\.1\()\d+\.\d+/");
 		}
 
-		private function extractGeneratedHigh() {
-			preg_match("/(?<=1-0:2\.8\.2\()\d+\.\d+/", $this->telegram, $matches);
-			return (float)$matches[0];
+		private function extractGeneratedHigh(): ?float {
+			return $this->extractValue("/(?<=1-0:2\.8\.2\()\d+\.\d+/");
 		}
 
-		private function extractConsumedGas() {
-			preg_match("/(?<=0-1:24.2.1\(\d{12}(W|S)\)\()\d+\.\d+/", $this->telegram, $matches);
-			return (float)$matches[0];
+		private function extractConsumedGas(): ?float {
+			return $this->extractValue("/(?<=0-1:24.2.1\(\d{12}(W|S)\)\()\d+\.\d+/");
 		}
 
 		private function buildTelegram($part) {

@@ -12,26 +12,26 @@
 			$this->RequireParent("{6DC3D946-0D31-450F-A8C6-C42DB8D7D4F1}");
 			$this->RegisterPropertyBoolean("Track power generation", false);
 
-			$var = IPS_GetObjectIDByIdent("CurrentPowerConsumption", $this->InstanceID);
-			if(!$var) {
+			$var = $this->getVariableIdByIdent("CurrentPowerConsumption");
+			if ($var === false) {
 				$id = $this->RegisterVariableFloat("CurrentPowerConsumption", "Power consumption", "~Watt.14490", 0);
 				$this->enableLogging($id, 0);
 			}
 
-			$var = IPS_GetObjectIDByIdent("ConsumedElectricityHigh", $this->InstanceID);
-			if(!$var) {
+			$var = $this->getVariableIdByIdent("ConsumedElectricityHigh");
+			if ($var === false) {
 				$id = $this->RegisterVariableFloat("ConsumedElectricityHigh", "Consumed electricity (high)", "~Electricity", 2);
 				$this->enableLogging($id, 1);
 			}
 
-			$var = IPS_GetObjectIDByIdent("ConsumedElectricityLow", $this->InstanceID);
-			if(!$var) {
+			$var = $this->getVariableIdByIdent("ConsumedElectricityLow");
+			if ($var === false) {
 				$id = $this->RegisterVariableFloat("ConsumedElectricityLow", "Consumed electricity (low)", "~Electricity", 1);
 				$this->enableLogging($id, 1);
 			}
 
-			$var = IPS_GetObjectIDByIdent("ConsumedGas", $this->InstanceID);
-			if(!$var) {
+			$var = $this->getVariableIdByIdent("ConsumedGas");
+			if ($var === false) {
 				$id = $this->RegisterVariableFloat("ConsumedGas", "Consumed gas", "~Gas", 10);
 				$this->enableLogging($id, 1);
 			}
@@ -49,20 +49,20 @@
 
 			$trackPowerGeneration = $this->ReadPropertyBoolean("Track power generation");
 			if($trackPowerGeneration) {
-				$var = IPS_GetObjectIDByIdent("CurrentPowerGeneration", $this->InstanceID);
-				if(!$var) {
+				$var = $this->getVariableIdByIdent("CurrentPowerGeneration");
+				if ($var === false) {
 					$id = $this->RegisterVariableFloat("CurrentPowerGeneration", "Power generation", "~Watt.14490", 3);
 					$this->enableLogging($id, 0);
 				}
 				
-				$var = IPS_GetObjectIDByIdent("GeneratedElectricityHigh", $this->InstanceID);
-				if(!$var) {
+				$var = $this->getVariableIdByIdent("GeneratedElectricityHigh");
+				if ($var === false) {
 					$id = $this->RegisterVariableFloat("GeneratedElectricityHigh", "Generated electricity (high)", "~Electricity", 5);
 					$this->enableLogging($id, 1);
 				}
 
-				$var = IPS_GetObjectIDByIdent("GeneratedElectricityLow", $this->InstanceID);
-				if(!$var) {
+				$var = $this->getVariableIdByIdent("GeneratedElectricityLow");
+				if ($var === false) {
 					$id = $this->RegisterVariableFloat("GeneratedElectricityLow", "Generated electricity (low)", "~Electricity", 4);
 					$this->enableLogging($id, 1);
 				}
@@ -70,6 +70,14 @@
 				$this->UnregisterVariable("CurrentPowerGeneration");
 				$this->UnregisterVariable("GeneratedElectricityHigh");
 				$this->UnregisterVariable("GeneratedElectricityLow");
+			}
+		}
+
+		private function getVariableIdByIdent(string $ident): int|false {
+			try {
+				return IPS_GetObjectIDByIdent($ident, $this->InstanceID);
+			} catch (Exception $e) {
+				return false;
 			}
 		}
 
